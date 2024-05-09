@@ -1,7 +1,8 @@
 import ChatBubble from "./ChatBubble";
 import MessageBox from "./MessageBox";
-import { useEffect, useState } from "react";
+import { useDebugValue, useEffect, useState } from "react";
 import apiClient from "../services/api-client";
+import ActiveUsers from "./ActiveUsers";
 
 const enum Styles {
   Container = "flex flex-col p-6 justify-center items-center",
@@ -18,47 +19,70 @@ const ChatPage = () => {
   const [isReceived, setReceived] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [usernames, setUsernames] = useState<{ [userId: string]: string }>({});
+  const [onlineUsers, setOnlineUsers] = useState(0);
 
   useEffect(() => {
-    const fetchMessages = async () => {
-      try {
-        const { data: messages } = await apiClient.from("messages").select();
-        if (messages) {
-          setMessages(messages);
-          setReceived(false);
-        }
-      } catch (error) {
-        console.error("Error fetching messages:", error);
-      }
-    };
+    fetchUsernames();
     fetchMessages();
   }, [messages]);
 
   useEffect(() => {
-    const fetchUsernames = async () => {
-      try {
-        const userIds = messages.map((message) => message.user_id);
-        const { data: profiles } = await apiClient
-          .from("profiles")
-          .select()
-          .in("id", userIds);
-        const usernameMap: { [userId: string]: string } = {};
+    const channel = apiClient.channel("online");
+    channel
+      .on("presence", { event: "sync" }, () => {
+        const userIds = [];
+        const newState = channel.presenceState();
 
-        if (profiles)
-          profiles.forEach((profile) => {
-            usernameMap[profile.id] = profile.username;
-          });
-        setUsernames(usernameMap);
-      } catch (error) {
-        console.error("Error fetching profiles:", error);
-      }
+        for (let id in newState) {
+          // @ts-ignore
+          userIds.push(newState[id][0].user_id);
+        }
+
+        setOnlineUsers([...new Set(userIds)].length);
+      })
+      .subscribe(async (status) => {
+        const currentUser = (await apiClient.auth.getUser()).data.user?.id;
+
+        if (status === "SUBSCRIBED") {
+          if (currentUser !== undefined)
+            await channel.track({
+              online_at: new Date().toISOString(),
+              user_id: currentUser,
+            });
+        }
+      });
+
+    return () => {
+      channel.unsubscribe();
     };
+  }, []);
 
-    fetchUsernames();
-  }, [messages]);
+  const fetchUsernames = async () => {
+    const userIds = messages.map((message) => message.user_id);
+    const { data: profiles } = await apiClient
+      .from("profiles")
+      .select()
+      .in("id", userIds);
+    const usernameMap: { [userId: string]: string } = {};
+
+    if (profiles)
+      profiles.forEach((profile) => {
+        usernameMap[profile.id] = profile.username;
+      });
+    setUsernames(usernameMap);
+  };
+
+  const fetchMessages = async () => {
+    const { data: messages } = await apiClient.from("messages").select();
+    if (messages) {
+      setMessages(messages);
+      setReceived(false);
+    }
+  };
 
   return (
     <div className={Styles.Container}>
+      <ActiveUsers activeUsersCount={onlineUsers} />
       {messages.map((message) => {
         return (
           <ChatBubble
