@@ -1,5 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
 import { useState, FormEvent, useRef, useEffect } from "react";
+import apiClient from "../services/api-client";
 
 const enum Styles {
   Box = "flex gap-3",
@@ -11,10 +11,6 @@ interface Props {
   onClick: () => void;
 }
 
-const apiEndpoint = import.meta.env.VITE_SUPABASE_API_ENDPOINT;
-const apiKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(apiEndpoint, apiKey);
-
 const MessageBox = ({ onClick: handleClick }: Props) => {
   const contentRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState({
@@ -23,7 +19,7 @@ const MessageBox = ({ onClick: handleClick }: Props) => {
   });
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
+    apiClient.auth.getUser().then(({ data }) => {
       if (data.user?.id) {
         setMessage((prevMessage) => ({
           ...prevMessage,
@@ -41,7 +37,7 @@ const MessageBox = ({ onClick: handleClick }: Props) => {
         content: contentRef.current.value,
       };
 
-      await supabase.from("messages").insert(newMessage).select();
+      await apiClient.from("messages").insert(newMessage).select();
       contentRef.current.value = "";
     }
   };
