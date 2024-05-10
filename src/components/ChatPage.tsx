@@ -1,10 +1,12 @@
 import ChatBubble from "./ChatBubble";
 import MessageBox from "./MessageBox";
-import { useDebugValue, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import apiClient from "../services/api-client";
 import ActiveUsers from "./ActiveUsers";
+import { useNavigate } from "react-router-dom";
 
 const enum Styles {
+  Button = "text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm w-full w-auto px-5 py-2.5 text-center",
   Container = "flex flex-col p-6 justify-center items-center",
 }
 
@@ -20,6 +22,7 @@ const ChatPage = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [usernames, setUsernames] = useState<{ [userId: string]: string }>({});
   const [onlineUsers, setOnlineUsers] = useState(0);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchUsernames();
@@ -80,9 +83,23 @@ const ChatPage = () => {
     }
   };
 
+  const handleClick = async () => {
+    try {
+      const result = await apiClient.auth.signOut();
+      if (result) navigate("/");
+    } catch {
+      console.log("Cannot sign out");
+    }
+  };
+
   return (
     <div className={Styles.Container}>
       <ActiveUsers activeUsersCount={onlineUsers} />
+      <div className="mb-6">
+        <button className={Styles.Button} onClick={handleClick}>
+          Logout
+        </button>
+      </div>
       {messages.map((message) => {
         return (
           <ChatBubble
