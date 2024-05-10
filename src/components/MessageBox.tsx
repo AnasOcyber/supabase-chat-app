@@ -12,11 +12,13 @@ interface Props {
 }
 
 const MessageBox = ({ onClick: handleClick }: Props) => {
+  const [user, setUser] = useState("");
   const contentRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState({
     content: "",
     user_id: "",
   });
+  const [isTyping, setTyping] = useState(false);
 
   useEffect(() => {
     apiClient.auth.getUser().then(({ data }) => {
@@ -25,9 +27,44 @@ const MessageBox = ({ onClick: handleClick }: Props) => {
           ...prevMessage,
           user_id: data.user.id,
         }));
+        setUser(data.user?.user_metadata.username);
       }
     });
   }, []);
+
+  useEffect(() => {
+    const channel = apiClient.channel("typing");
+    channel
+      .on(
+        "broadcast",
+        { event: "typingStatus" },
+        ({ payload: { isTyping } }) => {
+          setTyping(isTyping);
+        }
+      )
+      .subscribe((status) => {
+        if (status !== "SUBSCRIBED") {
+          return null;
+        }
+
+        channel.send({
+          type: "broadcast",
+          event: "typingStatus",
+          payload: { isTyping },
+        });
+      });
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [isTyping]);
+
+  let timeout: NodeJS.Timeout;
+  const handleChange = () => {
+    if (!isTyping) setTyping(true);
+    clearTimeout(timeout);
+    setTimeout(() => setTyping(false), 3000);
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -44,12 +81,14 @@ const MessageBox = ({ onClick: handleClick }: Props) => {
 
   return (
     <form onSubmit={handleSubmit}>
+      {isTyping && <p>typing...</p>}
       <div className={Styles.Box}>
         <input
           ref={contentRef}
           type="text"
           className={Styles.Input}
           placeholder="New message"
+          onChange={handleChange}
         />
         <button type="submit" onClick={handleClick} className={Styles.Button}>
           Send
