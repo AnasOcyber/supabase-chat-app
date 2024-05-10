@@ -1,5 +1,6 @@
 import { useState, FormEvent, useRef, useEffect } from "react";
 import apiClient from "../services/api-client";
+import TypingIndicator from "./TypingIndicator";
 
 const enum Styles {
   Box = "flex gap-3",
@@ -21,16 +22,17 @@ const MessageBox = ({ onClick: handleClick }: Props) => {
   const [isTyping, setTyping] = useState(false);
 
   useEffect(() => {
-    apiClient.auth.getUser().then(({ data }) => {
-      if (data.user?.id) {
+    apiClient.auth.getSession().then(({ data }) => {
+      const currentUser = data.session?.user;
+      if (currentUser) {
         setMessage((prevMessage) => ({
           ...prevMessage,
-          user_id: data.user.id,
+          user_id: currentUser?.id,
         }));
-        setUser(data.user?.user_metadata.username);
+        setUser(currentUser.user_metadata.username);
       }
     });
-  }, []);
+  }, [isTyping]);
 
   useEffect(() => {
     const channel = apiClient.channel("typing");
@@ -80,21 +82,23 @@ const MessageBox = ({ onClick: handleClick }: Props) => {
   };
 
   return (
-    <form onSubmit={handleSubmit}>
-      {isTyping && <p>typing...</p>}
-      <div className={Styles.Box}>
-        <input
-          ref={contentRef}
-          type="text"
-          className={Styles.Input}
-          placeholder="New message"
-          onChange={handleChange}
-        />
-        <button type="submit" onClick={handleClick} className={Styles.Button}>
-          Send
-        </button>
-      </div>
-    </form>
+    <>
+      <TypingIndicator isTyping={isTyping} />
+      <form onSubmit={handleSubmit}>
+        <div className={Styles.Box}>
+          <input
+            ref={contentRef}
+            type="text"
+            className={Styles.Input}
+            placeholder="New message"
+            onChange={handleChange}
+          />
+          <button type="submit" onClick={handleClick} className={Styles.Button}>
+            Send
+          </button>
+        </div>
+      </form>
+    </>
   );
 };
 
